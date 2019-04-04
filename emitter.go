@@ -55,12 +55,17 @@ func Sync(e *Event) { e.Flags = e.Flags | FlagSync }
 
 // New returns just created Emitter struct. Capacity argument
 // will be used to create channels with given capacity
-func New(capacity uint) *Emitter {
+func New(capacity uint, target ...interface{}) *Emitter {
+	var t interface{}
+	if len(target) != 0 {
+		t = target[0]
+	}
 	return &Emitter{
 		Cap:         capacity,
 		listeners:   make(map[string][]listener),
 		middlewares: make(map[string][]func(*Event)),
 		isInit:      true,
+		target:      t,
 	}
 }
 
@@ -73,6 +78,7 @@ type Emitter struct {
 	listeners   map[string][]listener
 	isInit      bool
 	middlewares map[string][]func(*Event)
+	target      interface{}
 }
 
 func newListener(capacity uint, middlewares ...func(*Event)) listener {
@@ -199,6 +205,17 @@ func (e *Emitter) Topics() []string {
 // Emit emits an event with the rest arguments to all
 // listeners which were covered by topic(it can be pattern).
 func (e *Emitter) Emit(topic string, args ...interface{}) chan struct{} {
+	return e.emit(topic, e.target, args...)
+}
+
+// Bubble emits
+func (e *Emitter) Bubble(topic string, target interface{}, args ...interface{}) {
+	e.emit(topic, target, args...)
+}
+
+// Emit emits an event with the rest arguments to all
+// listeners which were covered by topic(it can be pattern).
+func (e *Emitter) emit(topic string, target interface{}, args ...interface{}) chan struct{} {
 	e.mu.Lock()
 	e.init()
 	done := make(chan struct{}, 1)
@@ -213,6 +230,7 @@ func (e *Emitter) Emit(topic string, args ...interface{}) chan struct{} {
 			Topic:         _topic,
 			OriginalTopic: topic,
 			Args:          args,
+			Target:        target,
 		}
 
 		applyMiddlewares(&event, e.getMiddlewares(_topic))

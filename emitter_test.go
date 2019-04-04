@@ -306,6 +306,43 @@ func TestCallbackOnlyUsage(t *testing.T) {
 	expect(t, called, true)
 }
 
+func TestEmitWithTarget(t *testing.T) {
+	ee := New(0, 1)
+	ch := make(chan struct{})
+	pipe := ee.On("test")
+	var event Event
+	go func() {
+		select {
+		case event = <-pipe:
+			expect(t,event.Target,1)
+			ch <- struct{}{}
+		case <-time.After(1e5):
+			t.Errorf("timeout")
+			ch <- struct{}{}
+		}
+	}()
+	go ee.Emit("test")
+	<-ch
+}
+func TestBubble(t *testing.T) {
+	ee := New(0, 1)
+	ch := make(chan struct{})
+	pipe := ee.On("test")
+	var event Event
+	go func() {
+		select {
+		case event = <-pipe:
+			expect(t,event.Target,2)
+			ch <- struct{}{}
+		case <-time.After(1e5):
+			t.Errorf("timeout")
+			ch <- struct{}{}
+		}
+	}()
+	go ee.Bubble("test",2)
+	<-ch
+}
+
 func expect(t *testing.T, a interface{}, b interface{}) {
 	if a != b {
 		t.Errorf("Expected %v (type %v) - Got %v (type %v)", b, reflect.TypeOf(b), a, reflect.TypeOf(a))
